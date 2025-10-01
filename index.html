@@ -280,33 +280,60 @@
         <div class="eval-box eval-${operation}">操作力: ${operation}</div>
         <div class="eval-box eval-${repeat}">再現性: ${repeat}</div>
       `;
-
       let actions="";
       actions += "<b>出力量:</b> "+(output==="緑"?"出力は十分。維持を優先。":output==="黄"?"出力はあるが出し切れていない。パワートレーニング強化。":"出力不足。ウエイト・ジャンプ系を重点的に。")+"<br>";
-      actions += "<b>操作力:</b> "+(operation==="緑"?"骨盤と胸郭の連動良好。継続。":operation==="黄"?"連動は不安定。骨盤-胸郭連動ドリルを追加。":"体幹主導が弱い。基礎から再構築が必要。")+"<
-function drawHistoryChart(player) {
-  let db = JSON.parse(localStorage.getItem("records") || "{}");
-  const recs = (db[player] || []).sort((a,b)=> new Date(a.date) - new Date(b.date));
-  if (recs.length===0){ if(historyChart) historyChart.destroy(); return; }
+      actions += "<b>操作力:</b> "+(operation==="緑"?"骨盤と胸郭の連動良好。継続。":operation==="黄"?"連動は不安定。骨盤-胸郭連動ドリルを追加。":"体幹主導が弱い。基礎から再構築が必要。")+"<br>";
+      actions += "<b>再現性:</b> "+(repeat==="緑"?"安定している。高強度下での実践へ。":repeat==="黄"?"やや乱れる。持久性トレーニングを強化。":"疲労下で大きく低下。心肺・基礎反復を優先。");
 
-  const dates = recs.map(r => r.date);
-  const cmj = recs.map(r => parseFloat(r.cmj[0])||0);
-  const rj = recs.map(r => parseFloat(r.rj[0])||0);
-  const slam = recs.map(r => parseFloat(r.slam[0])||0);
-  const op   = recs.map(r => (parseFloat(r.pelvis[0])||0)+(parseFloat(r.thorax[0])||0));
+      document.getElementById("actionBox").innerHTML = actions;
 
-  if(historyChart) historyChart.destroy();
-  historyChart = new Chart(document.getElementById("historyChart"), {
-    type: 'line',
-    data: {
-      labels: dates,
-      datasets: [
-        { label:"CMJ", data: cmj, borderColor:"#3498db", fill:false },
-        { label:"RSI", data: rj, borderColor:"#2ecc71", fill:false },
-        { label:"MBスラム", data: slam, borderColor:"#e67e22", fill:false },
-        { label:"操作力", data: op, borderColor:"#9b59b6", fill:false }
-      ]
-    },
-    options: { responsive:true, plugins:{ title:{ display:true, text:"履歴推移" } } }
-  });
-}
+      // 差分サマリー
+      if (compareRec) {
+        const cmjDiff = (cmjVals[0] - (parseFloat(compareRec.cmj[0])||0)).toFixed(1);
+        const rjDiff = (rjVals[0] - (parseFloat(compareRec.rj[0])||0)).toFixed(2);
+        const slamDiff = (slamVals[0] - (parseFloat(compareRec.slam[0])||0)).toFixed(2);
+        const varDiff = (slamVar[0] - (parseFloat(compareRec.slamVar[0])||0)).toFixed(1);
+        const opDiff = (opTotal[0] - ((parseFloat(compareRec.pelvis[0])||0)+(parseFloat(compareRec.thorax[0])||0))).toFixed(0);
+
+        document.getElementById("diffBox").innerHTML = `
+          <div class="diff-item">CMJ: ${cmjDiff>=0?"+":""}${cmjDiff}cm ${arrowSymbol(cmjDiff)} ${diffBarHTML(cmjDiff)}</div>
+          <div class="diff-item">RSI: ${rjDiff>=0?"+":""}${rjDiff} ${arrowSymbol(rjDiff)} ${diffBarHTML(rjDiff)}</div>
+          <div class="diff-item">MBスラム: ${slamDiff>=0?"+":""}${slamDiff}m/s ${arrowSymbol(slamDiff)} ${diffBarHTML(slamDiff)}</div>
+          <div class="diff-item">変動率: ${varDiff>=0?"+":""}${varDiff}% ${arrowSymbol(varDiff,true)} ${diffBarHTML(-varDiff)}</div>
+          <div class="diff-item">操作力: ${opDiff>=0?"+":""}${opDiff}点 ${arrowSymbol(opDiff)} ${diffBarHTML(opDiff)}</div>
+        `;
+      }
+
+      // 履歴チャート更新
+      drawHistoryChart(currentPlayer);
+    }
+
+    function drawHistoryChart(player) {
+      let db = JSON.parse(localStorage.getItem("records") || "{}");
+      const recs = (db[player] || []).sort((a,b)=> new Date(a.date) - new Date(b.date));
+      if (recs.length===0){ if(historyChart) historyChart.destroy(); return; }
+
+      const dates = recs.map(r => r.date);
+      const cmj = recs.map(r => parseFloat(r.cmj[0])||0);
+      const rj = recs.map(r => parseFloat(r.rj[0])||0);
+      const slam = recs.map(r => parseFloat(r.slam[0])||0);
+      const op   = recs.map(r => (parseFloat(r.pelvis[0])||0)+(parseFloat(r.thorax[0])||0));
+
+      if(historyChart) historyChart.destroy();
+      historyChart = new Chart(document.getElementById("historyChart"), {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [
+            { label:"CMJ", data: cmj, borderColor:"#3498db", fill:false },
+            { label:"RSI", data: rj, borderColor:"#2ecc71", fill:false },
+            { label:"MBスラム", data: slam, borderColor:"#e67e22", fill:false },
+            { label:"操作力", data: op, borderColor:"#9b59b6", fill:false }
+          ]
+        },
+        options: { responsive:true, plugins:{ title:{ display:true, text:"履歴推移" } } }
+      });
+    }
+  </script>
+</body>
+</html>
