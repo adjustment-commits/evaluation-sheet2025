@@ -147,8 +147,140 @@
       el.style.display = (el.style.display==="none" ? "block" : "none");
     }
 
-    // ここに前回までの JS (saveData, updateCharts, drawHistoryChart など) をそのまま入れる
-    // 省略しますが、説明部分の追加以外は全て同じです
-  </script>
-</body>
-</html>
+    let cmjChart, rjChart, slamChart, opChart, historyChart;
+    let currentPlayer = "A";
+
+    function getRecord(player, date) {
+      let db = JSON.parse(localStorage.getItem("records") || "{}");
+      const recs = db[player] || [];
+      return recs.find(r => r.date === date);
+    }
+
+    function switchPlayer() {
+      currentPlayer = document.getElementById("playerSelect").value;
+      populateDateOptions(currentPlayer);
+      drawHistoryChart(currentPlayer);
+    }
+
+    function saveData() {
+      const record = {
+        date: testDate.value,
+        cmj: [cmjNormal.value, cmjFatigue.value],
+        rj: [rjNormal.value, rjFatigue.value],
+        slam: [slamNormal.value, slamFatigue.value],
+        slamVar: [slamVarNormal.value, slamVarFatigue.value],
+        pelvis: [pelvisNormal.value, pelvisFatigue.value],
+        thorax: [thoraxNormal.value, thoraxFatigue.value]
+      };
+      let db = JSON.parse(localStorage.getItem("records") || "{}");
+      if (!db[currentPlayer]) db[currentPlayer] = [];
+      db[currentPlayer].push(record);
+      localStorage.setItem("records", JSON.stringify(db));
+      populateDateOptions(currentPlayer);
+      alert("保存しました: " + currentPlayer);
+    }
+
+    function populateDateOptions(player) {
+      let db = JSON.parse(localStorage.getItem("records") || "{}");
+      const recs = db[player] || [];
+      const dateSelect = document.getElementById("dateSelect");
+      const compareSelect = document.getElementById("compareSelect");
+      dateSelect.innerHTML = '<option value="">-- 日付を選択 --</option>';
+      compareSelect.innerHTML = '<option value="">-- 比較なし --</option>';
+      recs.forEach(r => {
+        let opt1 = document.createElement("option");
+        opt1.value = r.date; opt1.text = r.date; dateSelect.appendChild(opt1);
+        let opt2 = document.createElement("option");
+        opt2.value = r.date; opt2.text = r.date; compareSelect.appendChild(opt2);
+      });
+    }
+
+    function loadSelectedDate() {
+      const date = document.getElementById("dateSelect").value;
+      if (!date) return;
+      const rec = getRecord(currentPlayer, date);
+      if (rec) {
+        testDate.value = rec.date;
+        cmjNormal.value = rec.cmj[0];
+        cmjFatigue.value = rec.cmj[1];
+        rjNormal.value = rec.rj[0];
+        rjFatigue.value = rec.rj[1];
+        slamNormal.value = rec.slam[0];
+        slamFatigue.value = rec.slam[1];
+        slamVarNormal.value = rec.slamVar[0];
+        slamVarFatigue.value = rec.slamVar[1];
+        pelvisNormal.value = rec.pelvis[0];
+        pelvisFatigue.value = rec.pelvis[1];
+        thoraxNormal.value = rec.thorax[0];
+        thoraxFatigue.value = rec.thorax[1];
+        updateCharts();
+      }
+    }
+
+    function arrowSymbol(val, inverse=false) {
+      if (val > 0) return inverse ? "🔴↓" : "🟢↑";
+      if (val < 0) return inverse ? "🟢↑" : "🔴↓";
+      return "⚪️→";
+    }
+
+    function diffBarHTML(val, inverse=false) {
+      const absVal = Math.min(Math.abs(val),10);
+      const width = absVal * 10;
+      if (val > 0) return `<div class="diff-bar ${inverse?"down-bar":"up-bar"}" style="width:${width}%;"></div>`;
+      if (val < 0) return `<div class="diff-bar ${inverse?"up-bar":"down-bar"}" style="width:${width}%;"></div>`;
+      return `<div class="diff-bar same-bar" style="width:10%;"></div>`;
+    }
+
+    function createChart(ctx, label, data, unit, tooltipExtra=null, maxY=null) {
+      return new Chart(ctx, {
+        type: 'bar',
+        data: { labels:['通常','疲労下'], datasets:[{label:label,data:data,backgroundColor:['#3498db','#9b59b6']}] },
+        options: { responsive:true,
+          plugins:{ legend:{display:false}, title:{display:true,text:label},
+            tooltip:{ callbacks:{ afterBody:function(c){ if(tooltipExtra){return tooltipExtra[c[0].dataIndex];}}}}},
+          scales:{ y:{ beginAtZero:true, max:maxY, title:{display:true,text:unit}}}
+        }
+      });
+    }
+
+    function updateCharts() {
+      const baseDate = document.getElementById("dateSelect").value;
+      const compareDate = document.getElementById("compareSelect").value;
+      const baseRec = getRecord(currentPlayer, baseDate);
+      const compareRec = compareDate ? getRecord(currentPlayer, compareDate) : null;
+      if (!baseRec) return;
+
+      const cmjVals=[parseFloat(baseRec.cmj[0])||0, parseFloat(baseRec.cmj[1])||0];
+      const rjVals=[parseFloat(baseRec.rj[0])||0, parseFloat(baseRec.rj[1])||0];
+      const slamVals=[parseFloat(baseRec.slam[0])||0, parseFloat(baseRec.slam[1])||0];
+      const slamVar=[parseFloat(baseRec.slamVar[0])||0, parseFloat(baseRec.slamVar[1])||0];
+      const opTotal=[(parseFloat(baseRec.pelvis[0])||0)+(parseFloat(baseRec.thorax[0])||0),
+                     (parseFloat(baseRec.pelvis[1])||0)+(parseFloat(baseRec.thorax[1])||0)];
+
+      if(cmjChart) cmjChart.destroy();
+      if(rjChart) rjChart.destroy();
+      if(slamChart) slamChart.destroy();
+      if(opChart) opChart.destroy();
+
+      cmjChart=createChart(document.getElementById('cmjChart'),'CMJ (cm)',cmjVals,'cm');
+      rjChart=createChart(document.getElementById('rjChart'),'リバウンドジャンプ RSI',rjVals,'RSI');
+      slamChart=createChart(document.getElementById('slamChart'),'MBスラム 平均速度 (m/s)',slamVals,'m/s',[`変動率:${slamVar[0]}%`,`変動率:${slamVar[1]}%`]);
+      opChart=createChart(document.getElementById('opChart'),'操作力（10点満点）',opTotal,'得点',[`骨盤:${baseRec.pelvis[0]} 胸郭:${baseRec.thorax[0]}`,`骨盤:${baseRec.pelvis[1]} 胸郭:${baseRec.thorax[1]}`],10);
+
+      // 総評
+      const cmjRate=(cmjVals[1]/(cmjVals[0]||1))*100;
+      const slamRate=(slamVals[1]/(slamVals[0]||1))*100;
+      const rate=Math.min(cmjRate,slamRate);
+      const output=(cmjVals[0]>=60&&rjVals[0]>=2.5&&slamVals[0]>=4.0&&slamVar[0]<=10)?"緑":(cmjVals[0]>=50&&rjVals[0]>=2.0&&slamVals[0]>=3.0&&slamVar[0]<=20)?"黄":"赤";
+      const operation=(opTotal[0]>=9)?"緑":(opTotal[0]>=6)?"黄":"赤";
+      const repeat=(rate>=80&&slamVar[1]<=20)?"緑":(rate>=60&&slamVar[1]<=30)?"黄":"赤";
+
+      document.getElementById("summaryBox").innerHTML=`
+        <div class="eval-box eval-${output}">出力量: ${output}</div>
+        <div class="eval-box eval-${operation}">操作力: ${operation}</div>
+        <div class="eval-box eval-${repeat}">再現性: ${repeat}</div>
+      `;
+
+      let actions="";
+      actions += "<b>出力量:</b> "+(output==="緑"?"出力は十分。維持を優先。":output==="黄"?"出力はあるが出し切れていない。パワートレーニング強化。":"出力不足。ウエイト・ジャンプ系を重点的に。")+"<br>";
+      actions += "<b>操作力:</b> "+(operation==="緑"?"骨盤と胸郭の連動良好。継続。":operation==="黄"?"連動は不安定。骨盤-胸郭連動ドリルを追加。":"体幹主導が弱い。基礎から再構築が必要。")+"<
