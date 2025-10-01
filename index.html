@@ -284,3 +284,29 @@
       let actions="";
       actions += "<b>出力量:</b> "+(output==="緑"?"出力は十分。維持を優先。":output==="黄"?"出力はあるが出し切れていない。パワートレーニング強化。":"出力不足。ウエイト・ジャンプ系を重点的に。")+"<br>";
       actions += "<b>操作力:</b> "+(operation==="緑"?"骨盤と胸郭の連動良好。継続。":operation==="黄"?"連動は不安定。骨盤-胸郭連動ドリルを追加。":"体幹主導が弱い。基礎から再構築が必要。")+"<
+function drawHistoryChart(player) {
+  let db = JSON.parse(localStorage.getItem("records") || "{}");
+  const recs = (db[player] || []).sort((a,b)=> new Date(a.date) - new Date(b.date));
+  if (recs.length===0){ if(historyChart) historyChart.destroy(); return; }
+
+  const dates = recs.map(r => r.date);
+  const cmj = recs.map(r => parseFloat(r.cmj[0])||0);
+  const rj = recs.map(r => parseFloat(r.rj[0])||0);
+  const slam = recs.map(r => parseFloat(r.slam[0])||0);
+  const op   = recs.map(r => (parseFloat(r.pelvis[0])||0)+(parseFloat(r.thorax[0])||0));
+
+  if(historyChart) historyChart.destroy();
+  historyChart = new Chart(document.getElementById("historyChart"), {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [
+        { label:"CMJ", data: cmj, borderColor:"#3498db", fill:false },
+        { label:"RSI", data: rj, borderColor:"#2ecc71", fill:false },
+        { label:"MBスラム", data: slam, borderColor:"#e67e22", fill:false },
+        { label:"操作力", data: op, borderColor:"#9b59b6", fill:false }
+      ]
+    },
+    options: { responsive:true, plugins:{ title:{ display:true, text:"履歴推移" } } }
+  });
+}
