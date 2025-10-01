@@ -1,0 +1,155 @@
+# evaluation-sheet2025
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>セミパーソナル ダッシュボード</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#f8f8f8; margin:20px; }
+    h1 { text-align:center; }
+    .form-section { background:#fff; padding:15px; border-radius:8px; margin-bottom:20px; }
+    label { display:inline-block; width:160px; margin:5px 0; }
+    .charts { display:flex; flex-wrap:wrap; gap:20px; justify-content:space-around; }
+    .chart-box { flex:1 1 300px; max-width:400px; background:#fff; padding:15px; border-radius:8px; }
+    .eval-box { display:inline-block; padding:6px 12px; border-radius:6px; font-weight:bold; color:#fff; margin:3px 0; }
+    .eval-緑 { background:#2ecc71; }
+    .eval-黄 { background:#f1c40f; color:#000; }
+    .eval-赤 { background:#e74c3c; }
+    .diff-item { background:#fff; padding:6px; border-radius:6px; font-size:14px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .diff-bar { height:6px; border-radius:3px; margin-top:4px; }
+    .up-bar { background:#2ecc71; }
+    .down-bar { background:#e74c3c; }
+    .same-bar { background:#bdc3c7; }
+    .info-box { background:#f9f9f9; border-left:4px solid #3498db; padding:8px; margin:6px 0; font-size:14px; border-radius:4px; }
+    .info-btn { margin-left:6px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <h1>セミパーソナル ダッシュボード</h1>
+
+  <!-- 選手と日付 -->
+  <div class="form-section">
+    <label>選手:</label>
+    <select id="playerSelect" onchange="switchPlayer()">
+      <option value="A">選手A</option>
+      <option value="B">選手B</option>
+      <option value="C">選手C</option>
+    </select>
+
+    <label>基準日付:</label>
+    <select id="dateSelect" onchange="loadSelectedDate()">
+      <option value="">-- 日付を選択 --</option>
+    </select>
+
+    <label>比較日付:</label>
+    <select id="compareSelect" onchange="updateCharts()">
+      <option value="">-- 比較なし --</option>
+    </select>
+    <br>
+
+    <button onclick="saveData()">保存</button>
+    <button onclick="updateCharts()">更新</button>
+  </div>
+
+  <!-- 入力フォーム + ℹ️説明 -->
+  <div class="form-section">
+    <label>日付入力:</label><input type="date" id="testDate"><br>
+
+    <label>CMJ 通常 (cm):</label>
+    <input type="number" id="cmjNormal">
+    <button type="button" class="info-btn" onclick="toggleInfo('cmjInfo')">ℹ️</button>
+    <div id="cmjInfo" class="info-box" style="display:none;">
+      <b>CMJ（カウンタームーブメントジャンプ）</b><br>
+      方法: 両手を腰に当て反動ジャンプ<br>
+      基準: 60cm以上＝優秀 / 50cm以上＝標準 / 50cm未満＝改善必要
+    </div><br>
+
+    <label>CMJ 疲労下 (cm):</label><input type="number" id="cmjFatigue"><br>
+
+    <label>RSI 通常:</label>
+    <input type="number" step="0.01" id="rjNormal">
+    <button type="button" class="info-btn" onclick="toggleInfo('rjInfo')">ℹ️</button>
+    <div id="rjInfo" class="info-box" style="display:none;">
+      <b>リバウンドジャンプ（RSI）</b><br>
+      方法: 10回連続ジャンプ。高さ÷接地時間<br>
+      基準: 2.5以上＝高水準 / 2.0以上＝標準 / 2.0未満＝改善必要
+    </div><br>
+
+    <label>RSI 疲労下:</label><input type="number" step="0.01" id="rjFatigue"><br>
+
+    <label>MBスラム 通常 速度:</label>
+    <input type="number" step="0.1" id="slamNormal">
+    <button type="button" class="info-btn" onclick="toggleInfo('slamInfo')">ℹ️</button>
+    <div id="slamInfo" class="info-box" style="display:none;">
+      <b>メディシンボールスラム</b><br>
+      方法: 頭上から床へ全力で叩きつける。速度センサーで計測。<br>
+      基準: 4.0m/s以上＝優秀 / 3.0m/s以上＝標準 / 3.0未満＝改善必要
+    </div><br>
+
+    <label>MBスラム 通常 変動率 (%):</label><input type="number" id="slamVarNormal"><br>
+    <label>MBスラム 疲労下 速度:</label><input type="number" step="0.1" id="slamFatigue"><br>
+    <label>MBスラム 疲労下 変動率 (%):</label><input type="number" id="slamVarFatigue"><br>
+
+    <label>骨盤レッグ 通常 (0-5):</label>
+    <input type="number" id="pelvisNormal">
+    <button type="button" class="info-btn" onclick="toggleInfo('pelvisInfo')">ℹ️</button>
+    <div id="pelvisInfo" class="info-box" style="display:none;">
+      <b>骨盤レッグ</b><br>
+      方法: 骨盤で脚を引き上げ、脚に力を抜く。<br>
+      基準: 4–5＝安定 / 2–3＝不安定 / 1＝課題大
+    </div><br>
+
+    <label>骨盤レッグ 疲労下 (0-5):</label><input type="number" id="pelvisFatigue"><br>
+
+    <label>胸郭プッシュ 通常 (0-5):</label>
+    <input type="number" id="thoraxNormal">
+    <button type="button" class="info-btn" onclick="toggleInfo('thoraxInfo')">ℹ️</button>
+    <div id="thoraxInfo" class="info-box" style="display:none;">
+      <b>胸郭プッシュ</b><br>
+      方法: 支持腕を固定し胸郭から回旋。腕だけの動きは×。<br>
+      基準: 4–5＝良好 / 2–3＝改善必要 / 1＝課題大
+    </div><br>
+
+    <label>胸郭プッシュ 疲労下 (0-5):</label><input type="number" id="thoraxFatigue"><br>
+  </div>
+
+  <!-- 総評 -->
+  <div class="form-section">
+    <h2>総評</h2>
+    <div id="summaryBox"></div>
+    <h3>次のアクション</h3>
+    <div id="actionBox"></div>
+  </div>
+
+  <!-- 差分サマリー -->
+  <div class="form-section">
+    <h2>差分サマリー</h2>
+    <div id="diffBox" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+  </div>
+
+  <!-- グラフ -->
+  <div class="charts">
+    <div class="chart-box"><canvas id="cmjChart"></canvas></div>
+    <div class="chart-box"><canvas id="rjChart"></canvas></div>
+    <div class="chart-box"><canvas id="slamChart"></canvas></div>
+    <div class="chart-box"><canvas id="opChart"></canvas></div>
+  </div>
+
+  <!-- 履歴チャート -->
+  <div class="form-section">
+    <h2>履歴チャート（個人）</h2>
+    <canvas id="historyChart"></canvas>
+  </div>
+
+  <script>
+    function toggleInfo(id) {
+      const el = document.getElementById(id);
+      el.style.display = (el.style.display==="none" ? "block" : "none");
+    }
+
+    // ここに前回までの JS (saveData, updateCharts, drawHistoryChart など) をそのまま入れる
+    // 省略しますが、説明部分の追加以外は全て同じです
+  </script>
+</body>
+</html>
