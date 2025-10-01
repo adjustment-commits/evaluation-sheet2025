@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>セミパーソナル ダッシュボード</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.jsは安定版に固定 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; background:#f8f8f8; margin:20px; }
     h1 { text-align:center; }
@@ -29,12 +30,8 @@
 
   <!-- 選手と日付 -->
   <div class="form-section">
-    <label>選手:</label>
-    <select id="playerSelect" onchange="switchPlayer()">
-      <option value="A">選手A</option>
-      <option value="B">選手B</option>
-      <option value="C">選手C</option>
-    </select>
+    <label>選手名:</label>
+    <input type="text" id="playerInput" placeholder="例: 山田太郎" oninput="onPlayerChange()"><br>
 
     <label>基準日付:</label>
     <select id="dateSelect" onchange="loadSelectedDate()">
@@ -142,13 +139,29 @@
   </div>
 
   <script>
+    // ℹ️表示
     function toggleInfo(id) {
       const el = document.getElementById(id);
       el.style.display = (el.style.display==="none" ? "block" : "none");
     }
 
     let cmjChart, rjChart, slamChart, opChart, historyChart;
-    let currentPlayer = "A";
+    let currentPlayer = "";
+
+    // 選手名変更時：日付プルダウンをその選手の履歴で更新
+    function onPlayerChange() {
+      currentPlayer = document.getElementById("playerInput").value.trim();
+      populateDateOptions(currentPlayer);
+      // 直前の描画をクリア
+      if (cmjChart) cmjChart.destroy();
+      if (rjChart) rjChart.destroy();
+      if (slamChart) slamChart.destroy();
+      if (opChart) opChart.destroy();
+      if (historyChart) historyChart.destroy();
+      document.getElementById("summaryBox").innerHTML = "";
+      document.getElementById("actionBox").innerHTML = "";
+      document.getElementById("diffBox").innerHTML = "";
+    }
 
     function getRecord(player, date) {
       let db = JSON.parse(localStorage.getItem("records") || "{}");
@@ -156,28 +169,32 @@
       return recs.find(r => r.date === date);
     }
 
-    function switchPlayer() {
-      currentPlayer = document.getElementById("playerSelect").value;
-      populateDateOptions(currentPlayer);
-      drawHistoryChart(currentPlayer);
-    }
-
     function saveData() {
+      const player = document.getElementById("playerInput").value.trim();
+      if (!player) { alert("選手名を入力してください"); return; }
+      const date = document.getElementById("testDate").value;
+      if (!date) { alert("日付を入力してください"); return; }
+
       const record = {
-        date: testDate.value,
-        cmj: [cmjNormal.value, cmjFatigue.value],
-        rj: [rjNormal.value, rjFatigue.value],
-        slam: [slamNormal.value, slamFatigue.value],
-        slamVar: [slamVarNormal.value, slamVarFatigue.value],
-        pelvis: [pelvisNormal.value, pelvisFatigue.value],
-        thorax: [thoraxNormal.value, thoraxFatigue.value]
+        date: date,
+        cmj: [document.getElementById("cmjNormal").value, document.getElementById("cmjFatigue").value],
+        rj: [document.getElementById("rjNormal").value, document.getElementById("rjFatigue").value],
+        slam: [document.getElementById("slamNormal").value, document.getElementById("slamFatigue").value],
+        slamVar: [document.getElementById("slamVarNormal").value, document.getElementById("slamVarFatigue").value],
+        pelvis: [document.getElementById("pelvisNormal").value, document.getElementById("pelvisFatigue").value],
+        thorax: [document.getElementById("thoraxNormal").value, document.getElementById("thoraxFatigue").value]
       };
       let db = JSON.parse(localStorage.getItem("records") || "{}");
-      if (!db[currentPlayer]) db[currentPlayer] = [];
-      db[currentPlayer].push(record);
+      if (!db[player]) db[player] = [];
+      db[player].push(record);
       localStorage.setItem("records", JSON.stringify(db));
-      populateDateOptions(currentPlayer);
-      alert("保存しました: " + currentPlayer);
+
+      currentPlayer = player;
+      populateDateOptions(player);
+
+      document.getElementById("dateSelect").value = date; // 自動で基準日付にセット
+      updateCharts();
+      alert("保存しました: " + player + " ("+date+")");
     }
 
     function populateDateOptions(player) {
@@ -193,41 +210,44 @@
         let opt2 = document.createElement("option");
         opt2.value = r.date; opt2.text = r.date; compareSelect.appendChild(opt2);
       });
+      drawHistoryChart(player);
     }
 
     function loadSelectedDate() {
       const date = document.getElementById("dateSelect").value;
-      if (!date) return;
+      if (!date || !currentPlayer) return;
       const rec = getRecord(currentPlayer, date);
       if (rec) {
-        testDate.value = rec.date;
-        cmjNormal.value = rec.cmj[0];
-        cmjFatigue.value = rec.cmj[1];
-        rjNormal.value = rec.rj[0];
-        rjFatigue.value = rec.rj[1];
-        slamNormal.value = rec.slam[0];
-        slamFatigue.value = rec.slam[1];
-        slamVarNormal.value = rec.slamVar[0];
-        slamVarFatigue.value = rec.slamVar[1];
-        pelvisNormal.value = rec.pelvis[0];
-        pelvisFatigue.value = rec.pelvis[1];
-        thoraxNormal.value = rec.thorax[0];
-        thoraxFatigue.value = rec.thorax[1];
+        document.getElementById("testDate").value = rec.date;
+        document.getElementById("cmjNormal").value = rec.cmj[0];
+        document.getElementById("cmjFatigue").value = rec.cmj[1];
+        document.getElementById("rjNormal").value = rec.rj[0];
+        document.getElementById("rjFatigue").value = rec.rj[1];
+        document.getElementById("slamNormal").value = rec.slam[0];
+        document.getElementById("slamFatigue").value = rec.slam[1];
+        document.getElementById("slamVarNormal").value = rec.slamVar[0];
+        document.getElementById("slamVarFatigue").value = rec.slamVar[1];
+        document.getElementById("pelvisNormal").value = rec.pelvis[0];
+        document.getElementById("pelvisFatigue").value = rec.pelvis[1];
+        document.getElementById("thoraxNormal").value = rec.thorax[0];
+        document.getElementById("thoraxFatigue").value = rec.thorax[1];
         updateCharts();
       }
     }
 
     function arrowSymbol(val, inverse=false) {
-      if (val > 0) return inverse ? "🔴↓" : "🟢↑";
-      if (val < 0) return inverse ? "🟢↑" : "🔴↓";
+      const v = Number(val);
+      if (v > 0) return inverse ? "🔴↓" : "🟢↑";
+      if (v < 0) return inverse ? "🟢↑" : "🔴↓";
       return "⚪️→";
     }
 
     function diffBarHTML(val, inverse=false) {
-      const absVal = Math.min(Math.abs(val),10);
+      const v = Number(val);
+      const absVal = Math.min(Math.abs(v),10);
       const width = absVal * 10;
-      if (val > 0) return `<div class="diff-bar ${inverse?"down-bar":"up-bar"}" style="width:${width}%;"></div>`;
-      if (val < 0) return `<div class="diff-bar ${inverse?"up-bar":"down-bar"}" style="width:${width}%;"></div>`;
+      if (v > 0) return `<div class="diff-bar ${inverse?"down-bar":"up-bar"}" style="width:${width}%;"></div>`;
+      if (v < 0) return `<div class="diff-bar ${inverse?"up-bar":"down-bar"}" style="width:${width}%;"></div>`;
       return `<div class="diff-bar same-bar" style="width:10%;"></div>`;
     }
 
@@ -246,6 +266,8 @@
     function updateCharts() {
       const baseDate = document.getElementById("dateSelect").value;
       const compareDate = document.getElementById("compareSelect").value;
+      if (!baseDate || !currentPlayer) return;
+
       const baseRec = getRecord(currentPlayer, baseDate);
       const compareRec = compareDate ? getRecord(currentPlayer, compareDate) : null;
       if (!baseRec) return;
@@ -267,7 +289,7 @@
       slamChart=createChart(document.getElementById('slamChart'),'MBスラム 平均速度 (m/s)',slamVals,'m/s',[`変動率:${slamVar[0]}%`,`変動率:${slamVar[1]}%`]);
       opChart=createChart(document.getElementById('opChart'),'操作力（10点満点）',opTotal,'得点',[`骨盤:${baseRec.pelvis[0]} 胸郭:${baseRec.thorax[0]}`,`骨盤:${baseRec.pelvis[1]} 胸郭:${baseRec.thorax[1]}`],10);
 
-      // 総評
+      // 総評（出力・操作力・再現性）
       const cmjRate=(cmjVals[1]/(cmjVals[0]||1))*100;
       const slamRate=(slamVals[1]/(slamVals[0]||1))*100;
       const rate=Math.min(cmjRate,slamRate);
@@ -280,11 +302,11 @@
         <div class="eval-box eval-${operation}">操作力: ${operation}</div>
         <div class="eval-box eval-${repeat}">再現性: ${repeat}</div>
       `;
+
       let actions="";
       actions += "<b>出力量:</b> "+(output==="緑"?"出力は十分。維持を優先。":output==="黄"?"出力はあるが出し切れていない。パワートレーニング強化。":"出力不足。ウエイト・ジャンプ系を重点的に。")+"<br>";
       actions += "<b>操作力:</b> "+(operation==="緑"?"骨盤と胸郭の連動良好。継続。":operation==="黄"?"連動は不安定。骨盤-胸郭連動ドリルを追加。":"体幹主導が弱い。基礎から再構築が必要。")+"<br>";
       actions += "<b>再現性:</b> "+(repeat==="緑"?"安定している。高強度下での実践へ。":repeat==="黄"?"やや乱れる。持久性トレーニングを強化。":"疲労下で大きく低下。心肺・基礎反復を優先。");
-
       document.getElementById("actionBox").innerHTML = actions;
 
       // 差分サマリー
@@ -302,6 +324,8 @@
           <div class="diff-item">変動率: ${varDiff>=0?"+":""}${varDiff}% ${arrowSymbol(varDiff,true)} ${diffBarHTML(-varDiff)}</div>
           <div class="diff-item">操作力: ${opDiff>=0?"+":""}${opDiff}点 ${arrowSymbol(opDiff)} ${diffBarHTML(opDiff)}</div>
         `;
+      } else {
+        document.getElementById("diffBox").innerHTML = "";
       }
 
       // 履歴チャート更新
@@ -334,6 +358,12 @@
         options: { responsive:true, plugins:{ title:{ display:true, text:"履歴推移" } } }
       });
     }
+
+    // 初期化：入力済みならその選手で日付を出す
+    document.addEventListener("DOMContentLoaded", () => {
+      currentPlayer = document.getElementById("playerInput").value.trim();
+      if (currentPlayer) populateDateOptions(currentPlayer);
+    });
   </script>
 </body>
 </html>
