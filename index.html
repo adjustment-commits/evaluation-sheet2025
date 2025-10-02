@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>セミパーソナル ダッシュボード</title>
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a7">
   <!-- Chart.jsは安定版に固定 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -24,6 +26,15 @@
     .info-box { background:#f9f9f9; border-left:4px solid #3498db; padding:8px; margin:6px 0; font-size:14px; border-radius:4px; }
     .info-btn { margin-left:6px; cursor:pointer; }
   </style>
+
+  <script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js")
+      .then(reg => console.log("Service Worker registered:", reg))
+      .catch(err => console.error("SW registration failed:", err));
+  }
+</script>
+
 </head>
 <body>
   <h1>セミパーソナル ダッシュボード</h1>
@@ -364,6 +375,7 @@
       currentPlayer = document.getElementById("playerInput").value.trim();
       if (currentPlayer) populateDateOptions(currentPlayer);
     });
+
   </script>
 </body>
 </html>
